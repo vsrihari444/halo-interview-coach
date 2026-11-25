@@ -1,0 +1,58 @@
+# SFT (DRAFT, validate during the competition): Gemma 4 26B-A4B LoRA interview coach, for the Gemma post-train track.
+# Adapted from Halo's examples/sft/gemma4/gemma4-26b-a4b-ultrachat-ep.yaml and the Gemma 4 cookbook's LoRA command.
+# Needs 8 GPUs at EP8 as written (try --expert_parallel_size=4 on 4 GPUs). google/gemma-4-26B-A4B-it is gated on
+# Hugging Face: accept the license and set HF_TOKEN.
+#   halo launch sft /workspace/coach/configs/sft-gemma4-26b-a4b-interview-coach-lora.yaml -n 8
+
+# --- Model ---
+model_name_or_path: google/gemma-4-26B-A4B-it
+moe_balancing: none                    # Gemma 4 has no active load-balancing path
+
+# --- Dataset ---
+dataset:
+- /workspace/coach/data/sft/train.jsonl
+conversation_field: prompt
+test_size: 0.05
+assistant_message_template: "<|turn>model\n"
+pad_token: <pad>
+remove_unused_columns: false
+
+# --- Parallelism & MoE precision ---
+expert_parallel_size: 8
+fp32_experts: true
+
+# --- Attention ---
+attn_implementation: sdpa
+packing: true
+max_length: 4096
+
+# --- LoRA (language model only) ---
+use_peft: true
+lora_target_modules:
+- q_proj
+- k_proj
+- v_proj
+- o_proj
+
+# --- Training ---
+per_device_train_batch_size: 1
+per_device_eval_batch_size: 1
+gradient_accumulation_steps: 8
+num_train_epochs: 2.0
+learning_rate: 1.0e-04
+lr_scheduler_type: cosine
+warmup_steps: 16
+
+# --- Output ---
+output_dir: /workspace/coach/checkpoints/sft-gemma4-26b-a4b-interview-coach-lora
+eval_strategy: steps
+eval_steps: 50
+save_steps: 100
+save_total_limit: 2
+save_only_model: true
+
+# --- Logging ---
+logging_steps: 1
+logging_first_step: true
+report_to: none
+dataloader_num_workers: 2

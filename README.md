@@ -25,6 +25,7 @@ Built by [Srihari Reddy Vunadi](https://github.com/vsrihari444) for the [Halo Co
 | 1. Seed set | 50 hand-written examples (20 strong, 16 medium, 14 weak answers; 9 with confirmed facts) across engineering, data, product, sales and behavioral questions | `data/seed/seed.jsonl` |
 | 2. Synthetic data | A writer model drafts question + answer at a planned quality; a teacher model writes reference feedback with the seed as few-shot. Rows that fail the schema or grounding checks are dropped | OpenRouter (any OpenAI-compatible API), `scripts/generate_data.py` |
 | 3. SFT | LoRA SFT of `Qwen/Qwen3-4B-Instruct-2507` on one GPU | Halo `sft`, `configs/sft-qwen3-4b-interview-coach-lora.yaml` |
+| 3b. Gemma port | The same recipe on `google/gemma-4-26B-A4B-it` (LoRA, expert parallel) | Halo `sft`, `configs/sft-gemma4-26b-a4b-interview-coach-lora.yaml` (draft) |
 | 4. RL (stage 2) | Online GRPO with Halo's built-in **judge** reward (OpenRouter-hosted) scoring score accuracy, actionability, grounding and schema, plus a JSON format reward | Halo `grpo/online`, `configs/grpo-qwen3-4b-interview-coach-judge.yaml` |
 | 5. Eval | Base vs SFT vs GRPO on a held-out split: JSON/schema validity, **grounded rate** (no invented numbers), calibration on strong/weak answers, score MAE vs reference, plus an LLM judge | `scripts/eval.py` |
 | 6. Compute | Serverless GPU launcher for the Halo image | Modal, `modal_app/train_sft.py` |
@@ -61,7 +62,7 @@ _To be finalized by Dec 10 with the exact Halo version, dataset snapshot (publis
 ```
 coach/rubric.py        system prompt, JSON schema, grounding + calibration checks (shared by data, eval and tests)
 scripts/               generate_data.py, build_datasets.py, eval.py, _llm.py (stdlib OpenAI-compatible client)
-configs/               Halo configs: LoRA SFT and online GRPO with an OpenRouter judge
+configs/               Halo configs: LoRA SFT (Qwen3-4B, Gemma 4 26B-A4B) and online GRPO with an OpenRouter judge
 data/seed/seed.jsonl   50 hand-written examples
 modal_app/             Modal launcher for the Halo image
 tests/                 unit tests for the rubric checks and seed set
