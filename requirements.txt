@@ -1,0 +1,4 @@
+# The data and eval scripts use only the Python standard library (3.10+).
+# Training runs inside the Halo container image (public.ecr.aws/whitecircle/halo:hopper or :blackwell).
+# Optional, for the Modal launcher:
+modal>=1.0

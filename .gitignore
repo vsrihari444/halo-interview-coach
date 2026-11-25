@@ -1,0 +1,13 @@
+.env
+*.env
+!.env.example
+__pycache__/
+*.pyc
+checkpoints/
+results/
+data/generated/
+data/sft/
+data/grpo/
+data/eval/
+wandb/
+.venv/
