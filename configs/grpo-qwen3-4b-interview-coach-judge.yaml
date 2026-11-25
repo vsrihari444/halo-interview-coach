@@ -1,0 +1,74 @@
+# Online GRPO (stage 2, DRAFT, validate on Dec 1): RL the SFT checkpoint with an OpenRouter-hosted judge.
+# Adapted from Halo's examples/grpo/online/rlvr-online-grpo-template.yaml and qwen3-4b smoke config.
+# Halo's `judge` reward term calls an OpenAI-compatible model; its default endpoint is OpenRouter and it reads
+# OPENROUTER_API_KEY. Data: data/grpo/train.jsonl rows {"prompt": [system, user], "answer": <reference feedback JSON>}.
+# Launch (needs >= 2 GPUs: vLLM rollout server on one, trainer on the rest):
+#   VLLM_MODEL=/workspace/coach/checkpoints/sft-merged docker compose -f docker-compose.vllm.yml up -d vllm-server   # GPU 0
+#   CUDA_VISIBLE_DEVICES=1,2,3 halo launch grpo/online /workspace/coach/configs/grpo-qwen3-4b-interview-coach-judge.yaml -n 3
+
+# --- Model --- (the merged SFT checkpoint; see `halo run` checkpoint tools for merging LoRA)
+model_name_or_path: /workspace/coach/checkpoints/sft-merged
+attn_implementation: sdpa
+
+# --- Dataset ---
+dataset: /workspace/coach/data/grpo/train.jsonl
+test_size: 0.02
+prompt_field: prompt
+answer_field: answer
+
+# --- Rewards ---
+rewards:
+  - source: format
+    name: json_only
+    weight: 0.3
+    pattern: "^\\s*\\{[\\s\\S]*\\}\\s*$"
+  - source: judge
+    name: coach_quality
+    weight: 1.0
+    view: final
+    include_reference: true          # the judge sees the expert reference feedback
+    model: openai/gpt-oss-120b       # any OpenRouter model id
+    reasoning_effort: low
+    context: "The policy is an interview coach. It must return one JSON object with scores (1-5) for clarity, specificity, structure and concept_coverage, plus strengths, improvements, missing_concepts and rewrite_tip. It must never invent facts about the candidate."
+    requirements:
+      - {name: score_accuracy, description: "Scores match the true quality of the candidate's answer (compare with the reference).", weight: 2}
+      - {name: actionability, description: "Improvements are concrete, specific to this answer, and useful.", weight: 1}
+      - {name: grounding, description: "No invented employers, metrics, dates or results; unknown details are [bracketed placeholders]; confirmed facts are used when relevant.", weight: 2}
+      - {name: schema, description: "Exactly the required JSON keys with the right types.", weight: 1}
+
+# --- GRPO Hyperparameters ---
+beta: 0.0
+num_iterations: 1
+epsilon: 0.15
+scale_rewards: group
+num_generations: 8
+temperature: 1.0
+loss_type: grpo
+
+# --- Training ---
+per_device_train_batch_size: 2
+gradient_accumulation_steps: 8
+max_steps: 200
+learning_rate: 1.0e-06
+lr_scheduler_type: constant
+max_prompt_length: 1024
+max_completion_length: 768
+
+# --- vLLM Generation ---
+use_vllm: true
+vllm_mode: server
+vllm_server_host: 127.0.0.1
+
+# --- Output ---
+output_dir: /workspace/coach/checkpoints/grpo-qwen3-4b-interview-coach
+save_steps: 50
+save_total_limit: 3
+save_only_model: true
+
+# --- Logging ---
+logging_steps: 1
+logging_first_step: true
+report_to: none
+log_completions: true
+
+use_peft: false

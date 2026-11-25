@@ -1,0 +1,63 @@
+# SFT: Qwen3-4B LoRA interview coach. Adapted from Halo's examples/sft/qwen3/qwen3-4b-ultrachat-lora.yaml.
+# Data: data/sft/train.jsonl built by scripts/build_datasets.py; rows are {"prompt": [system, user, assistant]}.
+# Paths are absolute because Halo runs from its own repo root: mount this repo at /workspace/coach.
+# Launch (1 GPU, inside the Halo image):
+#   PYTORCH_CUDA_ALLOC_CONF=expandable_segments:True halo launch sft /workspace/coach/configs/sft-qwen3-4b-interview-coach-lora.yaml
+# Smoke first:
+#   halo launch sft /workspace/coach/configs/sft-qwen3-4b-interview-coach-lora.yaml --max_steps=5 --save_strategy=no --report_to=none
+
+# --- Model ---
+model_name_or_path: Qwen/Qwen3-4B-Instruct-2507
+
+# --- Dataset ---
+dataset:
+- /workspace/coach/data/sft/train.jsonl
+conversation_field: prompt
+assistant_message_template: "<|im_start|>assistant\n"   # must byte-match the Qwen3 chat template
+test_size: 0.05
+
+# --- LoRA ---
+use_peft: true
+lora_r: 64
+lora_alpha: 128
+lora_target_modules:
+- q_proj
+- k_proj
+- v_proj
+- o_proj
+- gate_proj
+- up_proj
+- down_proj
+
+# --- Training ---
+per_device_train_batch_size: 4
+per_device_eval_batch_size: 4
+num_train_epochs: 3.0            # small dataset (a few thousand rows): a few epochs
+gradient_accumulation_steps: 4
+gradient_checkpointing_kwargs:
+  use_reentrant: false
+learning_rate: 1.0e-04           # Halo's shipped LoRA recipes use 1e-4
+lr_scheduler_type: cosine
+warmup_steps: 16
+
+# --- Sequence Length & Packing ---
+max_length: 2048                 # rows longer than this are DROPPED, not truncated
+packing: true
+
+# --- Output ---
+output_dir: /workspace/coach/checkpoints/sft-qwen3-4b-interview-coach-lora
+eval_strategy: steps
+eval_steps: 50
+save_strategy: steps
+save_steps: 100
+save_total_limit: 3
+save_only_model: true
+
+# --- Logging ---
+logging_steps: 1
+logging_first_step: true
+log_decoded_samples: true        # check the assistant-turn masking once, then turn off
+report_to: none                  # set to wandb if WANDB_API_KEY is available
+
+# --- Data ---
+dataloader_num_workers: 4
